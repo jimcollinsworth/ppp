@@ -65,8 +65,8 @@ dtype={
 parse_dates = ["DateApproved", "ForgivenessDate", "LoanStatusDate"]
 
 df = pd.read_csv(
-        "E:\\data\\ppp\\public_up_to_150k_5_230930.csv",
-        #Path(__file__).parent / "../sample-big.csv",
+        #"E:\\data\\ppp\\public_up_to_150k_5_230930.csv",
+        Path(__file__).parent / "../sample-big.csv",
         #parse_dates=parse_dates,  # seems to pick out dates fine without this, 
         dtype=dtype,
         na_values="NA")
@@ -75,18 +75,16 @@ print(df.info())
 print(df.dtypes)
 print(f"{df['BorrowerState']}{df['ProcessingMethod']}")
 
-app_ui = ui.page_fluid(
-    ui.panel_title("PPP Loan data from SBA"),
-    ui.input_slider(
-        "value",
-        "InitialApprovalAmount",
-        0,
-        10000000,
-        10000,
-    ),
-    ui.card(
-        ui.card_header("Summary statistics"),
-        ui.output_data_frame("summary_statistics"),
+app_ui = ui.page_fillable(
+    ui.navset_tab(
+        ui.nav("Data",
+            ui.panel_title("PPP Loan data from SBA"),
+            ui.output_data_frame("summary_statistics")
+        ),
+        ui.nav("Distribution",
+            ui.panel_title("Various distributions"),
+        ),
+    
     )
 )
 
@@ -96,7 +94,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     def filtered_df() -> pd.DataFrame:
         #filt_df = df[df["BorrowerState"] == 'AL']
         filt_df = df
-        filt_df = filt_df.loc[filt_df["InitialApprovalAmount"] > input.value()]
+        #filt_df = filt_df.loc[filt_df["InitialApprovalAmount"] > input.value()]
         return filt_df
 
     
