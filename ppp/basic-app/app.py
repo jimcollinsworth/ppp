@@ -40,7 +40,7 @@ dtype={
         "ProjectState":  'category',
         "ProjectZip":  'category',
         "CD":  'string',
-        "JobsReported":  'int64',
+        "JobsReported":  'string',
         "NAICSCode":  'string',
         "Race":  'category',
         "Ethnicity":  'category',
@@ -65,40 +65,37 @@ dtype={
 parse_dates = ["DateApproved", "ForgivenessDate", "LoanStatusDate"]
 
 df = pd.read_csv(
-        Path(__file__).parent / "../sample-ppp.csv", 
+        "E:\\data\\ppp\\public_up_to_150k_5_230930.csv",
+        #Path(__file__).parent / "../sample-big.csv",
+        #parse_dates=parse_dates,  # seems to pick out dates fine without this, 
         dtype=dtype,
-        parse_dates=parse_dates,
         na_values="NA")
 
 print(df.info())
 print(df.dtypes)
 print(f"{df['BorrowerState']}{df['ProcessingMethod']}")
 
-app_ui = ui.page_sidebar(
-    ui.sidebar(
-        ui.input_slider(
-            "value",
-            "InitialApprovalAmount",
-            0,
-            10000000,
-            10000,
-        )
+app_ui = ui.page_fluid(
+    ui.panel_title("PPP Loan data from SBA"),
+    ui.input_slider(
+        "value",
+        "InitialApprovalAmount",
+        0,
+        10000000,
+        10000,
     ),
-    ui.row(
-        ui.layout_columns(
-            ui.card(
-                ui.card_header("Summary statistics"),
-                ui.output_data_frame("summary_statistics"),
-            ),
-        ),
-    ),
+    ui.card(
+        ui.card_header("Summary statistics"),
+        ui.output_data_frame("summary_statistics"),
+    )
 )
 
 
 def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Calc
     def filtered_df() -> pd.DataFrame:
-        filt_df = df[df["BorrowerState"] == 'AL']
+        #filt_df = df[df["BorrowerState"] == 'AL']
+        filt_df = df
         filt_df = filt_df.loc[filt_df["InitialApprovalAmount"] > input.value()]
         return filt_df
 
