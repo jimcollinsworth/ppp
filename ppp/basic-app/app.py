@@ -1,12 +1,10 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from pandas.api.types import CategoricalDtype
-import seaborn as sns
-
+import matplotlib.pyplot as plt
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
-
-sns.set_theme(style="white")
 
 # define columns for PPP FOIA file https://data.sba.gov/dataset/ppp-foia
 dtype={
@@ -76,31 +74,18 @@ print(df.dtypes)
 print(f"{df['BorrowerState']}{df['ProcessingMethod']}")
 
 app_ui = ui.page_fillable(
-    ui.navset_tab(
-        ui.nav("Data",
-            ui.panel_title("PPP Loan data from SBA"),
-            ui.output_data_frame("summary_statistics")
+        ui.panel_title("PPP Loan data from SBA"),
+        ui.output_data_frame("summary_statistics"),
+        ui.panel_main(
+            ui.output_plot("histogram"),
         ),
-        ui.nav("Distribution",
-            ui.panel_title("Various distributions"),
-        ),
-    
-    )
 )
 
-
 def server(input: Inputs, output: Outputs, session: Session):
-    @reactive.Calc
-    def filtered_df() -> pd.DataFrame:
-        #filt_df = df[df["BorrowerState"] == 'AL']
-        filt_df = df
-        #filt_df = filt_df.loc[filt_df["InitialApprovalAmount"] > input.value()]
-        return filt_df
 
-    
     @render.data_frame
     def summary_statistics():
-        display_df = filtered_df()[
+        display_df = df()[
             [
                 "LoanNumber","DateApproved","SBAOfficeCode",
                 "ProcessingMethod","BorrowerName","BorrowerAddress",
@@ -125,5 +110,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         ]
         return render.DataGrid(display_df, filters=True)
 
+    @output
+    @render.plot
+    def histogram():
+        plt.hist(df['CurrentApprovalAmount'], 25, density=True)
 
 app = App(app_ui, server)
