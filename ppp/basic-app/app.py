@@ -1,10 +1,13 @@
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from pandas.api.types import CategoricalDtype
+
 import matplotlib.pyplot as plt
+import seaborn as sns
+
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
+from shiny.types import FileInfo
 
 # define columns for PPP FOIA file https://data.sba.gov/dataset/ppp-foia
 dtype={
@@ -60,6 +63,8 @@ dtype={
         "ForgivenessAmount":  'float64'
 }
 
+sns.set(style="darkgrid")
+
 parse_dates = ["DateApproved", "ForgivenessDate", "LoanStatusDate"]
 
 df = pd.read_csv(
@@ -73,19 +78,48 @@ print(df.info())
 print(df.dtypes)
 print(f"{df['BorrowerState']}{df['ProcessingMethod']}")
 
-app_ui = ui.page_fillable(
+app_ui = ui.page_navbar( 
+    ui.nav_panel("Data", 
         ui.panel_title("PPP Loan data from SBA"),
+        ui.input_file("file1", "Choose PPO CSV File", accept=[".csv"], multiple=False),
         ui.output_data_frame("summary_statistics"),
         ui.panel_main(
             ui.output_plot("histogram"),
+        )
+    ), 
+    ui.nav_panel("pandas", 
+        ui.output_data_frame("pandas_info"),
+    ),
+    ui.nav_panel("Detailed Profiler",
+        ui.panel_main(
+            ui.HTML("<strong>open('..\\output.html').read()</strong>")
         ),
-)
+    ), 
+    title="PPP Loan data from SBA", 
+    id="navbar", 
+    position="fixed-top", 
+) 
+
 
 def server(input: Inputs, output: Outputs, session: Session):
+    @reactive.Calc
+    def parsed_file():
+        file: list[FileInfo] | None = input.file1()
+        if file is None:
+            return pd.DataFrame()
+        return pd.read_csv(  # pyright: ignore[reportUnknownMemberType]
+            file[0]["datapath"]
+        )
 
+    @output
     @render.data_frame
     def summary_statistics():
-        display_df = df()[
+        df = parsed_file()
+
+        if df.empty:
+            return pd.DataFrame()
+        
+        display_df = df[
             [
                 "LoanNumber","DateApproved","SBAOfficeCode",
                 "ProcessingMethod","BorrowerName","BorrowerAddress",
@@ -113,6 +147,11 @@ def server(input: Inputs, output: Outputs, session: Session):
     @output
     @render.plot
     def histogram():
-        plt.hist(df['CurrentApprovalAmount'], 25, density=True)
+        sns.histplot(data=df, x='CurrentApprovalAmount')
+
+    @output
+    @render.ui
+    def pandas_info():
+        pass
 
 app = App(app_ui, server)
