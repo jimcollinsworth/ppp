@@ -9,8 +9,34 @@ import seaborn as sns
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from shiny.types import FileInfo
 
-# define columns for PPP FOIA file https://data.sba.gov/dataset/ppp-foia
-dtype={
+sns.set(style="darkgrid")
+
+app_ui = ui.page_navbar(
+    ui.nav_panel("Data", 
+        ui.panel_title("PPP Loan data from SBA"),
+        ui.input_file("file1", "Choose PPO CSV File", accept=[".csv"], multiple=False),
+        ui.output_data_frame("summary_statistics"),
+        ui.panel_main(
+            ui.output_plot("histogram"),
+        )
+    ), 
+    ui.nav_panel("pandas", 
+        ui.output_data_frame("pandas_info"),
+    ),
+    ui.nav_panel("Detailed Profiler",
+        ui.panel_main(
+            ui.HTML("<strong>open('..\\output.html').read()</strong>")
+        ),
+    ), 
+    title="PPP Loan data from SBA", 
+    id="navbar", 
+    position="fixed-top",
+    fillable=True 
+) 
+
+def load_df(file_name: str) -> pd.DataFrame:
+    # define columns for PPP FOIA file https://data.sba.gov/dataset/ppp-foia
+    dtype={
         "LoanNumber": "int64",
         "SBAOfficeCode": "category",
         "ProcessingMethod": "category",
@@ -45,13 +71,13 @@ dtype={
         "NAICSCode":  'string',
         "Race":  'category',
         "Ethnicity":  'category',
- #       "UTILITIES_PROCEED":  'float64',
- #       "PAYROLL_PROCEED":  'float64',
- #       "MORTGAGE_INTEREST_PROCEED":  'float64',
- #       "RENT_PROCEED":  'float64',
- #       "REFINANCE_EIDL_PROCEED":  'float64',
- #       "HEALTH_CARE_PROCEED":  'float64',
- #       "DEBT_INTEREST_PROCEED":  'float64',
+    #       "UTILITIES_PROCEED":  'float64',
+    #       "PAYROLL_PROCEED":  'float64',
+    #       "MORTGAGE_INTEREST_PROCEED":  'float64',
+    #       "RENT_PROCEED":  'float64',
+    #       "REFINANCE_EIDL_PROCEED":  'float64',
+    #       "HEALTH_CARE_PROCEED":  'float64',
+    #       "DEBT_INTEREST_PROCEED":  'float64',
         "BusinessType":  'string',
         "OriginatingLenderLocationID":  'string',
         "OriginatingLender":  'string',
@@ -61,65 +87,40 @@ dtype={
         "Veteran":  'category',
         "NonProfit":  'category',
         "ForgivenessAmount":  'float64'
-}
+    }
+    parse_dates = ["DateApproved", "ForgivenessDate", "LoanStatusDate"]
 
-sns.set(style="darkgrid")
-
-parse_dates = ["DateApproved", "ForgivenessDate", "LoanStatusDate"]
-
-df = pd.read_csv(
+    df = pd.read_csv(
         #"E:\\data\\ppp\\public_up_to_150k_5_230930.csv",
-        Path(__file__).parent / "../sample-big.csv",
+        Path(__file__).parent / file_name,
         #parse_dates=parse_dates,  # seems to pick out dates fine without this, 
         dtype=dtype,
         na_values="NA")
 
-print(df.info())
-print(df.dtypes)
-print(f"{df['BorrowerState']}{df['ProcessingMethod']}")
+    print(df.info())
+    print(df.dtypes)
+    print(f"{df['BorrowerState']}{df['ProcessingMethod']}")
+    
+    return df
 
-app_ui = ui.page_navbar( 
-    ui.nav_panel("Data", 
-        ui.panel_title("PPP Loan data from SBA"),
-        ui.input_file("file1", "Choose PPO CSV File", accept=[".csv"], multiple=False),
-        ui.output_data_frame("summary_statistics"),
-        ui.panel_main(
-            ui.output_plot("histogram"),
-        )
-    ), 
-    ui.nav_panel("pandas", 
-        ui.output_data_frame("pandas_info"),
-    ),
-    ui.nav_panel("Detailed Profiler",
-        ui.panel_main(
-            ui.HTML("<strong>open('..\\output.html').read()</strong>")
-        ),
-    ), 
-    title="PPP Loan data from SBA", 
-    id="navbar", 
-    position="fixed-top", 
-) 
-
+# global for now, where should the big df go for Shiny? in server?
+df = reactive.value()
 
 def server(input: Inputs, output: Outputs, session: Session):
-    @reactive.Calc
+
+    @reactive.Effect
     def parsed_file():
         file: list[FileInfo] | None = input.file1()
         if file is None:
-            return pd.DataFrame()
-        return pd.read_csv(  # pyright: ignore[reportUnknownMemberType]
-            file[0]["datapath"]
-        )
+            pass
+        else:
+            df.set(load_df(file[0]["datapath"]))
 
     @output
     @render.data_frame
     def summary_statistics():
-        df = parsed_file()
-
-        if df.empty:
-            return pd.DataFrame()
-        
-        display_df = df[
+    
+        display_df = df()[
             [
                 "LoanNumber","DateApproved","SBAOfficeCode",
                 "ProcessingMethod","BorrowerName","BorrowerAddress",
@@ -147,7 +148,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @output
     @render.plot
     def histogram():
-        sns.histplot(data=df, x='CurrentApprovalAmount')
+        sns.histplot(data=df(), x='CurrentApprovalAmount')
 
     @output
     @render.ui
